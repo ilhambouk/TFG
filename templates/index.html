@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seleccionar archivo</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Adjunte el documento Excel</h1>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <!-- Selección de convocatoria -->
+            <label for="convocatoria"></label>
+            <select id="convocatoria" name="convocatoria" required>
+                <option value="" disabled selected>Seleccione convocatoria</option>
+                <option value="ordinaria">Ordinaria</option>
+                <option value="extraordinaria">Extraordinaria</option>
+            </select>
+            <!-- Botón estilizado para seleccionar archivo -->
+            <label for="fileInput" class="custom-file-label">Seleccione archivo</label>
+            <input type="file" id="fileInput" name="file" accept=".xls,.xlsx" required>
+            <p id="fileName">Ningún archivo seleccionado</p>
+            <!-- Botón de envío -->
+            <button type="submit">Enviar</button>
+        </form>
+        <p id="statusMessage"></p>
+        <!-- Sección de descargas -->
+        <div id="downloadSection" style="display: none;">
+            <ul id="downloadList"></ul>
+        </div>
+    </div>
+    
+    <script>
+        const fileInput = document.getElementById("fileInput");
+        const fileName = document.getElementById("fileName");
+        const statusMessage = document.getElementById("statusMessage");
+        const downloadSection = document.getElementById("downloadSection");
+        const downloadList = document.getElementById("downloadList");
+        const form = document.getElementById("uploadForm");
+
+        // Mostrar el nombre del archivo seleccionado
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files.length > 0) {
+                fileName.textContent = fileInput.files[0].name;
+            } else {
+                fileName.textContent = "Ningún archivo seleccionado";
+            }
+        });
+
+        // Manejo del formulario de envío
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+            formData.append("convocatoria", document.getElementById("convocatoria").value);
+
+            statusMessage.textContent = "Procesando archivo...";
+            statusMessage.style.color = "blue";
+            downloadSection.style.display = "none"; // Ocultar enlace de descarga
+            downloadList.innerHTML = ""; // Limpiar lista de descargas anteriores
+
+            try {
+                const response = await fetch("/upload", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const data = await response.json();
+
+                // Manejo de la respuesta
+                if (response.ok) {
+                    statusMessage.textContent = "Archivo procesado. Soluciones generadas:";
+                    statusMessage.style.color = "green";
+
+                    // Mostrar el enlace de descarga
+                    downloadSection.style.display = "block";
+                    data.downloads.forEach(file => {
+                        const listItem = document.createElement("li");
+                        const link = document.createElement("a");
+                        link.href = file.url;
+                        link.textContent = file.filename;
+                        link.download = file.filename;
+                        listItem.appendChild(link);
+                        downloadList.appendChild(listItem);
+                    });
+                } else {
+                    statusMessage.textContent = `${data.error}`;
+                    statusMessage.style.color = "red";
+                    // Asegurar que la sección de descargas no se muestre en caso de error
+                    downloadSection.style.display = "none";
+                }
+            } catch (error) {
+                statusMessage.textContent = "Error de conexión.";
+                statusMessage.style.color = "red";
+                // Asegurar que la sección de descargas no se muestre en caso de error
+                downloadSection.style.display = "none";  
+            }
+        });
+    </script>
+</body>
+</html>
