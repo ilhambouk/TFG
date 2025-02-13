@@ -362,7 +362,7 @@ def main(file_path):
 
     # Permite buscar soluciones diversas
     model.setParam(GRB.Param.PoolSearchMode, 2)  
-    model.setParam(GRB.Param.PoolSolutions, 100) # Número máximo de soluciones a almacenar 
+    model.setParam(GRB.Param.PoolSolutions, 3) # Número máximo de soluciones a almacenar 
     model.setParam(GRB.Param.PoolGap, 0.01)  # Ajusta el gap para permitir más diversidad
     model.setParam(GRB.Param.MIPFocus, 1)    # Cambia el enfoque de la búsqueda
 
@@ -377,35 +377,32 @@ def main(file_path):
         for i in range(num_solutions):
             model.setParam(GRB.Param.SolutionNumber, i)
 
-            # Crear un DataFrame para almacenar las asignaciones de la solución actual
-            asignaciones_solucion = []
-
-            # Extraer las asignaciones de la solución actual
-            for (grado_idx, asignatura_id, slot_id), var in x.items():
-                if var.Xn > 0.5:  # Si la variable es 1 (asignación activa)
-                    # Obtener los datos de la asignatura y el slot
-                    nombre_hoja = list(hojas_dict.keys())[grado_idx]
-                    asignatura_row = hojas_dict[nombre_hoja].loc[
-                        hojas_dict[nombre_hoja]["ID_asignatura"] == asignatura_id
-                    ].iloc[0]
-                    slot_row = slots_df.loc[slot_id]
-
-                    # Agregar la asignación a la lista
-                    asignaciones_solucion.append({
-                        "Asignatura": asignatura_row["ID_asignatura"],
-                        "Curso": asignatura_row["Curso"],
-                        "Cuatrimestre": asignatura_row["Cuatrimestre"],
-                        "Fecha": slot_row["datetime"].date(),  # Solo la fecha
-                        "Hora": slot_row["datetime"].time(),  # Solo la hora
-                    })
-
-            # Crear un DataFrame con las asignaciones
-            df_solucion = pd.DataFrame(asignaciones_solucion)
-
-            # Guardar el DataFrame en un archivo de Excel
+            # Crear un ExcelWriter para guardar la solución actual
             output_file = os.path.join(SOLUTION_FOLDER, f"solucion_{i+1}.xlsx")
             with pd.ExcelWriter(output_file) as writer:
-                df_solucion.to_excel(writer, sheet_name=nombre_hoja, index=False)
+
+                for grado_idx, (nombre_hoja, df_grado) in enumerate(hojas_dict.items()):
+                    if "ID_asignatura" in df_grado.columns:
+                        # Crear un DataFrame para almacenar las asignaciones de este grado
+                        asignaciones_grado = []
+                        # Extraer las asignaciones de este grado en la solución actual
+                        for asignatura_idx, row in df_grado.iterrows():
+                            asignatura_id = row["ID_asignatura"]
+                            for slot_idx, slot_row in slots_df.iterrows():
+                                if slot_row["cuatrimestre"] == "1-2":
+                                    if x[(grado_idx, asignatura_id, slot_row["ID_slot"])].Xn > 0.5:
+                                        # Agregar la asignación a la lista
+                                        asignaciones_grado.append({
+                                            "Asignatura": asignatura_id,
+                                            "Curso": row["Curso"],
+                                            "Cuatrimestre": row["Cuatrimestre"],
+                                            "Fecha": slot_row["datetime"].date(),  # Solo la fecha
+                                            "Hora": slot_row["datetime"].time(),   # Solo la hora
+                                        })
+
+                        # Crear un DataFrame con las asignaciones
+                        df_solucion = pd.DataFrame(asignaciones_grado)
+                        df_solucion.to_excel(writer, sheet_name=nombre_hoja, index=False)
 
             print(f"Solución {i+1} guardada en {output_file}")
 
